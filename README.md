@@ -15,6 +15,7 @@ uv run python server.py
 The server will start two services:
 - **HTTP Dashboard**: http://localhost:8080 (open in browser)
 - **WebSocket Server**: ws://localhost:8765 (for phone + browser connections)
+- **Air Mouse Client**: optional macOS pointer controller, started separately
 
 ### Phone (Android + Termux)
 
@@ -47,6 +48,43 @@ The right panel shows:
 - **Beta (Pitch)**: rotation around X axis (-90 to +90°)
 - **Gamma (Roll)**: rotation around Y axis (-90 to +90°)
 - **Quaternion**: raw x, y, z, w values
+
+## Air Mouse (macOS)
+
+The optional air mouse client turns phone orientation into relative macOS pointer
+movement. It is movement-only in this first version; use your normal mouse or
+trackpad for clicks.
+
+Start the server and phone client first, then run:
+
+```bash
+uv run python air_mouse.py --server ws://localhost:8765/
+```
+
+Hold the phone still when the client connects. After a short stable window, that
+pose becomes neutral. Tilting left/right moves the cursor horizontally; tilting
+forward/back moves it vertically. Return to the neutral pose to stop movement.
+Press `Ctrl+C` to stop the air mouse client. Restart it to recenter.
+
+macOS may require permission before a terminal-launched process can control the
+pointer. If movement is blocked, open **System Settings → Privacy & Security**
+and allow your terminal app under **Accessibility** and **Input Monitoring**.
+
+Tuning options:
+
+```bash
+uv run python air_mouse.py \
+  --server ws://localhost:8765/ \
+  --sensitivity 80 \
+  --deadzone 0.03 \
+  --smoothing 0.25 \
+  --max-speed 35
+```
+
+- `--sensitivity`: cursor speed per radian of phone movement
+- `--deadzone`: neutral-zone size in radians to suppress jitter
+- `--smoothing`: cursor smoothing, from `0.0` immediate to higher values
+- `--max-speed`: maximum cursor pixels per sensor update
 
 ## Data Format
 
@@ -109,5 +147,6 @@ Phone (Termux)
 
 - Add accelerometer data
 - Add gyroscope data
+- Add air mouse click controls
 - Log data to file
 - Record/playback sessions
