@@ -2,6 +2,10 @@
 
 Stream real-time phone orientation data from Android (Termux) to your laptop and visualize it with a 3D axes diagram and live readouts.
 
+## Preview
+
+![Phone Orientation Dashboard web UI](docs/images/dashboard-screenshot.png)
+
 ## Setup
 
 ### Laptop
