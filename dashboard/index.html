@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Orientation Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0f1419;
+            color: #e8eef2;
+        }
+
+        #container {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+        }
+
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: #1a1f26;
+            border-bottom: 1px solid #2a2f37;
+        }
+
+        #title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #666;
+            transition: background 0.2s;
+        }
+
+        .status-dot.connected {
+            background: #4ade80;
+            box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+        }
+
+        .status-dot.disconnected {
+            background: #ef4444;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+        }
+
+        #content {
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        #canvas-container {
+            background: #15191f;
+            border: 1px solid #2a2f37;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #readout {
+            background: #1a1f26;
+            border: 1px solid #2a2f37;
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 13px;
+            overflow-y: auto;
+        }
+
+        .readout-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .readout-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #888;
+            font-weight: 600;
+        }
+
+        .readout-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .readout-name {
+            color: #bbb;
+        }
+
+        .readout-value {
+            font-family: "Courier New", monospace;
+            font-weight: 600;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #2a2f37;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.1s ease-out;
+        }
+
+        .progress-fill.alpha {
+            background: linear-gradient(90deg, #ef4444, #f97316);
+        }
+
+        .progress-fill.beta {
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+        }
+
+        .progress-fill.gamma {
+            background: linear-gradient(90deg, #3b82f6, #0ea5e9);
+        }
+
+        .euler-item {
+            margin-bottom: 8px;
+        }
+
+        .divider {
+            height: 1px;
+            background: #2a2f37;
+            margin: 4px 0;
+        }
+
+        .quaternion {
+            font-size: 12px;
+            line-height: 1.6;
+            color: #999;
+        }
+
+        .quaternion-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <div id="title">Phone Orientation Dashboard</div>
+            <div class="status">
+                <span id="status-text">Waiting...</span>
+                <div class="status-dot" id="status-dot"></div>
+            </div>
+        </div>
+        <div id="content">
+            <div id="canvas-container">
+                <canvas id="canvas"></canvas>
+            </div>
+            <div id="readout">
+                <div class="readout-section">
+                    <div class="readout-label">Orientation</div>
+
+                    <div class="euler-item">
+                        <div class="readout-item">
+                            <span class="readout-name">Alpha (Yaw)</span>
+                            <span class="readout-value" id="alpha">0.0°</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill alpha" id="alpha-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="euler-item">
+                        <div class="readout-item">
+                            <span class="readout-name">Beta (Pitch)</span>
+                            <span class="readout-value" id="beta">0.0°</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill beta" id="beta-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="euler-item">
+                        <div class="readout-item">
+                            <span class="readout-name">Gamma (Roll)</span>
+                            <span class="readout-value" id="gamma">0.0°</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill gamma" id="gamma-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="readout-section">
+                    <div class="quaternion-label">Quaternion</div>
+                    <div class="quaternion">
+                        x: <span id="quat-x">0.0000</span><br>
+                        y: <span id="quat-y">0.0000</span><br>
+                        z: <span id="quat-z">0.0000</span><br>
+                        w: <span id="quat-w">1.0000</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        let ws = null;
+        let scene, camera, renderer, pivot;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = Infinity;
+
+        function initThreeJS() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x15191f);
+
+            camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+            camera.position.set(3, 3, 3);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            pivot = new THREE.Group();
+            scene.add(pivot);
+
+            const axes = new THREE.AxesHelper(2);
+            pivot.add(axes);
+
+            const grid = new THREE.GridHelper(4, 10, 0x3a3f47, 0x2a2f37);
+            grid.position.y = -2;
+            scene.add(grid);
+
+            function animate() {
+                renderer.render(scene, camera);
+                requestAnimationFrame(animate);
+            }
+            animate();
+
+            window.addEventListener('resize', () => {
+                const w = canvas.clientWidth;
+                const h = canvas.clientHeight;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            });
+        }
+
+        function updateReadout(data) {
+            const q = data.quaternion;
+
+            const euler = new THREE.Euler().setFromQuaternion(
+                new THREE.Quaternion(q.x, q.y, q.z, q.w),
+                'ZYX'
+            );
+
+            const alpha = THREE.MathUtils.radToDeg(euler.z) % 360;
+            const beta = THREE.MathUtils.radToDeg(euler.x);
+            const gamma = THREE.MathUtils.radToDeg(euler.y);
+
+            document.getElementById('alpha').textContent = alpha.toFixed(1) + '°';
+            document.getElementById('beta').textContent = beta.toFixed(1) + '°';
+            document.getElementById('gamma').textContent = gamma.toFixed(1) + '°';
+
+            document.getElementById('alpha-bar').style.width = ((alpha % 360) / 360 * 100) + '%';
+            document.getElementById('beta-bar').style.width = ((beta + 90) / 180 * 100) + '%';
+            document.getElementById('gamma-bar').style.width = ((gamma + 90) / 180 * 100) + '%';
+
+            document.getElementById('quat-x').textContent = q.x.toFixed(4);
+            document.getElementById('quat-y').textContent = q.y.toFixed(4);
+            document.getElementById('quat-z').textContent = q.z.toFixed(4);
+            document.getElementById('quat-w').textContent = q.w.toFixed(4);
+
+            if (pivot) {
+                pivot.quaternion.set(q.x, q.y, q.z, q.w);
+            }
+        }
+
+        function setConnected(connected) {
+            if (connected) {
+                statusDot.classList.remove('disconnected');
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+                reconnectAttempts = 0;
+            } else {
+                statusDot.classList.remove('connected');
+                statusDot.classList.add('disconnected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const url = protocol + '//' + window.location.hostname + ':8765';
+
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                setConnected(true);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'orientation') {
+                        updateReadout(data);
+                    } else if (data.type === 'disconnected') {
+                        setConnected(false);
+                    }
+                } catch (e) {
+                    console.error('Failed to parse message:', e);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                setConnected(false);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket closed');
+                setConnected(false);
+                setTimeout(connect, 3000);
+            };
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initThreeJS();
+            setConnected(false);
+            connect();
+        });
+    </script>
+</body>
+</html>
