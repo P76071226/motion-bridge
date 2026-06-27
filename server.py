@@ -7,6 +7,8 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import websockets
 
+from controller import build_controller_message
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,12 @@ phone_ws = None
 latest_data = None
 browser_clients = set()
 
+def build_broadcast_messages(data):
+    messages = [data]
+    if data.get("type") == "orientation" and isinstance(data.get("quaternion"), dict):
+        messages.append(build_controller_message(data["quaternion"]))
+    return messages
+
 async def phone_handler(websocket, path):
     global phone_ws, latest_data
     phone_ws = websocket
@@ -28,7 +36,8 @@ async def phone_handler(websocket, path):
             try:
                 data = json.loads(message)
                 latest_data = data
-                await broadcast_to_browsers(data)
+                for broadcast_data in build_broadcast_messages(data):
+                    await broadcast_to_browsers(broadcast_data)
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON from phone: {e}")
     except websockets.exceptions.ConnectionClosed:
