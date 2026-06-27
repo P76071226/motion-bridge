@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import socket
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -19,6 +20,47 @@ DASHBOARD_DIR = Path(__file__).parent / "dashboard"
 phone_ws = None
 latest_data = None
 browser_clients = set()
+
+def get_lan_ip_candidates():
+    candidates = []
+
+    try:
+        hostname = socket.gethostname()
+        for info in socket.getaddrinfo(hostname, None, socket.AF_INET):
+            ip = info[4][0]
+            if ip not in candidates:
+                candidates.append(ip)
+    except socket.gaierror:
+        pass
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("8.8.8.8", 80))
+            ip = probe.getsockname()[0]
+            if ip not in candidates:
+                candidates.insert(0, ip)
+    except OSError:
+        pass
+
+    if "127.0.0.1" not in candidates:
+        candidates.append("127.0.0.1")
+
+    return candidates
+
+def build_status_payload(host=None, http_port=HTTP_PORT, websocket_port=PHONE_PORT, ip_candidates=None):
+    candidates = ip_candidates or get_lan_ip_candidates()
+    selected_host = host or candidates[0]
+
+    return {
+        "type": "status",
+        "host": selected_host,
+        "http_port": http_port,
+        "websocket_port": websocket_port,
+        "ip_candidates": candidates,
+        "dashboard_url": f"http://{selected_host}:{http_port}",
+        "phone_ws_url": f"ws://{selected_host}:{websocket_port}/phone",
+        "phone_command": f"python phone_client.py --server {selected_host}",
+    }
 
 def build_broadcast_messages(data):
     messages = [data]
@@ -81,6 +123,18 @@ async def ws_server():
 
 def run_http_server():
     class DashboardHandler(SimpleHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/status":
+                body = json.dumps(build_status_payload()).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            super().do_GET()
+
         def translate_path(self, path):
             path = super().translate_path(path)
             rel = Path(path).relative_to(Path.cwd())

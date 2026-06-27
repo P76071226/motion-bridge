@@ -175,6 +175,20 @@
             margin-bottom: 4px;
         }
 
+        .setup-value {
+            overflow-wrap: anywhere;
+            color: #d7dee5;
+            font-family: "Courier New", monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .setup-list {
+            color: #999;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
         .control-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -188,8 +202,9 @@
             color: #e8eef2;
             cursor: pointer;
             font: inherit;
+            font-size: 12px;
             font-weight: 600;
-            padding: 8px 10px;
+            padding: 7px 9px;
         }
 
         button:disabled {
@@ -256,6 +271,15 @@
                 <div class="divider"></div>
 
                 <div class="readout-section">
+                    <div class="readout-label">Phone Setup</div>
+                    <div class="setup-value" id="phone-command">Loading setup command...</div>
+                    <button id="copy-command">Copy Command</button>
+                    <div class="setup-list" id="setup-links"></div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="readout-section">
                     <div class="readout-label">Calibration</div>
                     <div class="control-row">
                         <button id="set-neutral" disabled>Set Neutral</button>
@@ -285,6 +309,9 @@
         const canvas = document.getElementById('canvas');
         const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
+        const phoneCommand = document.getElementById('phone-command');
+        const copyCommand = document.getElementById('copy-command');
+        const setupLinks = document.getElementById('setup-links');
         const setNeutralButton = document.getElementById('set-neutral');
         const clearNeutralButton = document.getElementById('clear-neutral');
         const calibrationStatus = document.getElementById('calibration-status');
@@ -293,6 +320,7 @@
         let scene, camera, renderer, pivot;
         let reconnectAttempts = 0;
         const maxReconnectAttempts = Infinity;
+        let latestPhoneCommand = '';
         let latestRawQuaternion = null;
         const calibration = PhoneOrientation.createCalibrationState();
 
@@ -426,10 +454,39 @@
             };
         }
 
+        async function loadSetupStatus() {
+            try {
+                const response = await fetch('/status');
+                const status = await response.json();
+                latestPhoneCommand = status.phone_command;
+                phoneCommand.textContent = status.phone_command;
+                setupLinks.innerHTML = [
+                    'Dashboard: ' + status.dashboard_url,
+                    'Phone WS: ' + status.phone_ws_url,
+                    'IPs: ' + status.ip_candidates.join(', ')
+                ].join('<br>');
+            } catch (error) {
+                phoneCommand.textContent = 'Unable to load setup status.';
+                setupLinks.textContent = 'Check that server.py is running.';
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             initThreeJS();
             setConnected(false);
+            loadSetupStatus();
             connect();
+
+            copyCommand.addEventListener('click', async () => {
+                if (!latestPhoneCommand || !navigator.clipboard) {
+                    return;
+                }
+                await navigator.clipboard.writeText(latestPhoneCommand);
+                copyCommand.textContent = 'Copied';
+                setTimeout(() => {
+                    copyCommand.textContent = 'Copy Command';
+                }, 1200);
+            });
 
             setNeutralButton.addEventListener('click', () => {
                 if (!latestRawQuaternion) {
