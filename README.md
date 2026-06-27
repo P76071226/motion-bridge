@@ -64,6 +64,29 @@ Phone → Server → Browser (JSON over WebSocket):
 }
 ```
 
+The server also emits a normalized controller message after each orientation
+update so other apps can consume phone tilt without doing quaternion math:
+
+```json
+{
+  "type": "controller",
+  "axes": {
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "roll": 0.0
+  },
+  "quaternion": {
+    "x": 0.12,
+    "y": 0.34,
+    "z": 0.05,
+    "w": 0.93
+  }
+}
+```
+
+Axis values are normalized to `-1.0` through `1.0`. Apps can connect to
+`ws://<laptop-ip>:8765/` and listen for `type: "controller"` messages.
+
 ## Architecture
 
 ```
