@@ -174,6 +174,35 @@
             font-weight: 600;
             margin-bottom: 4px;
         }
+
+        .control-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        button {
+            border: 1px solid #36404c;
+            border-radius: 6px;
+            background: #222a33;
+            color: #e8eef2;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 600;
+            padding: 8px 10px;
+        }
+
+        button:disabled {
+            color: #68727f;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        #calibration-status {
+            color: #999;
+            font-size: 12px;
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
@@ -227,6 +256,17 @@
                 <div class="divider"></div>
 
                 <div class="readout-section">
+                    <div class="readout-label">Calibration</div>
+                    <div class="control-row">
+                        <button id="set-neutral" disabled>Set Neutral</button>
+                        <button id="clear-neutral" disabled>Clear</button>
+                    </div>
+                    <div id="calibration-status">Connect the phone, then set a neutral pose.</div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="readout-section">
                     <div class="quaternion-label">Quaternion</div>
                     <div class="quaternion">
                         x: <span id="quat-x">0.0000</span><br>
@@ -240,15 +280,21 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="orientation.js"></script>
     <script>
         const canvas = document.getElementById('canvas');
         const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
+        const setNeutralButton = document.getElementById('set-neutral');
+        const clearNeutralButton = document.getElementById('clear-neutral');
+        const calibrationStatus = document.getElementById('calibration-status');
 
         let ws = null;
         let scene, camera, renderer, pivot;
         let reconnectAttempts = 0;
         const maxReconnectAttempts = Infinity;
+        let latestRawQuaternion = null;
+        const calibration = PhoneOrientation.createCalibrationState();
 
         function initThreeJS() {
             scene = new THREE.Scene();
@@ -288,7 +334,8 @@
         }
 
         function updateReadout(data) {
-            const q = data.quaternion;
+            latestRawQuaternion = data.quaternion;
+            const q = PhoneOrientation.applyCalibration(latestRawQuaternion, calibration);
 
             const euler = new THREE.Euler().setFromQuaternion(
                 new THREE.Quaternion(q.x, q.y, q.z, q.w),
@@ -315,6 +362,8 @@
             if (pivot) {
                 pivot.quaternion.set(q.x, q.y, q.z, q.w);
             }
+
+            updateCalibrationControls();
         }
 
         function setConnected(connected) {
@@ -328,6 +377,17 @@
                 statusDot.classList.add('disconnected');
                 statusText.textContent = 'Disconnected';
             }
+            updateCalibrationControls();
+        }
+
+        function updateCalibrationControls() {
+            setNeutralButton.disabled = !latestRawQuaternion;
+            clearNeutralButton.disabled = !calibration.calibrated;
+            calibrationStatus.textContent = calibration.calibrated
+                ? 'Neutral pose active. Readouts are relative to that baseline.'
+                : latestRawQuaternion
+                    ? 'Raw phone orientation. Set neutral to zero the current pose.'
+                    : 'Connect the phone, then set a neutral pose.';
         }
 
         function connect() {
@@ -370,6 +430,21 @@
             initThreeJS();
             setConnected(false);
             connect();
+
+            setNeutralButton.addEventListener('click', () => {
+                if (!latestRawQuaternion) {
+                    return;
+                }
+                calibration.setNeutral(latestRawQuaternion);
+                updateReadout({ type: 'orientation', quaternion: latestRawQuaternion });
+            });
+
+            clearNeutralButton.addEventListener('click', () => {
+                calibration.clearNeutral();
+                if (latestRawQuaternion) {
+                    updateReadout({ type: 'orientation', quaternion: latestRawQuaternion });
+                }
+            });
         });
     </script>
 </body>
